@@ -1,0 +1,40 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: password
+data:
+  password: c2VjcmV0
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: username
+stringData:
+  username: my-user
+
+#! reads two secrets and creates a secret from them
+---
+apiVersion: secretgen.carvel.dev/v1alpha1
+kind: SecretTemplate
+metadata:
+  name: new-secret
+spec:
+  #! list of resources to read information off
+  inputResources:
+  - name: username-secret
+    ref:
+      apiVersion: v1
+      kind: Secret
+      name: username
+  - name: password-secret
+    ref:
+      apiVersion: v1
+      kind: Secret
+      name: password
+  #! the template that follows a subset of the Secret API
+  template:
+    #! data is used for templating in data that *is* base64 encoded, most likely Secrets.
+    data:
+      username: $(.username-secret.data.username)
+      password: $(.password-secret.data.password)

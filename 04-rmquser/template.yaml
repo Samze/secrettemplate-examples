@@ -1,0 +1,79 @@
+
+---
+apiVersion: secretgen.carvel.dev/v1alpha1
+kind: SecretTemplate
+metadata:
+  name: rmq-user-bindable
+spec:
+  serviceAccountName: rmq-reader
+  inputResources:
+  - name: user
+    ref:
+      apiVersion: rabbitmq.com/v1beta1
+      kind: User
+      name: rmq-user
+  - name: rmq
+    ref:
+      apiVersion: rabbitmq.com/v1beta1
+      kind: RabbitmqCluster
+      name: $(.user.spec.rabbitmqClusterReference.name)
+  - name: service
+    ref:
+      apiVersion: v1
+      kind: Service
+      name: $(.rmq.status.defaultUser.serviceReference.name)
+  - name: creds
+    ref:
+      apiVersion: v1
+      kind: Secret
+      name: $(.user.metadata.name)-user-credentials 
+  template:
+    type: rabbitmq
+    stringData:
+      type: rabbitmq
+      port: $(.service.spec.ports[?(@.name=="amqp")].port)
+      host: $(.service.spec.clusterIP)
+      username: $(.user.status.username)   
+    data:        
+      password: $(.creds.data.password)
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rmq-reader
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rmq-reader
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - rabbitmq.com
+  resources:
+  - rabbitmqclusters
+  - users
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rmq-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rmq-reader
+subjects:
+- kind: ServiceAccount
+  name: rmq-reader
